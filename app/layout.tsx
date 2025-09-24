@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import "./globals.css"
+import "../styles/highlight.css"
 
 export const metadata: Metadata = {
   title: "WACE - Your Space. Your AI. Your Progress.",

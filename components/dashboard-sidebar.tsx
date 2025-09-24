@@ -1,16 +1,23 @@
 "use client"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Plus, Compass, Home, ShoppingBag, Settings } from "lucide-react"
+import { Plus, Compass, Home, ShoppingBag, Settings, Sparkles } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useState } from "react"
+import { AIAssistant } from "@/components/ai-assistant"
 
 export function DashboardSidebar() {
   const pathname = usePathname()
+  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false)
+
+  // Check if user is premium (for now, hardcoded for yf80804@gmail.com)
+  const isPremiumUser = true // In real app, this would check user's subscription status
+  const userEmail = "yf80804@gmail.com" // In real app, this would come from auth context
 
   const userPods = [
     { id: 1, name: "Trice", avatar: "/tech-startup-logo.png", isActive: true },
@@ -71,6 +78,25 @@ export function DashboardSidebar() {
               <p>Explore Pods</p>
             </TooltipContent>
           </Tooltip>
+
+          {/* Premium AI Assistant - Only show for premium users */}
+          {isPremiumUser && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div 
+                  className="w-12 h-12 rounded-2xl hover:rounded-xl transition-all duration-200 hover:bg-gradient-to-r hover:from-purple-500/20 hover:to-blue-500/20 flex items-center justify-center cursor-pointer shadow-sm relative"
+                  onClick={() => setIsAIAssistantOpen(true)}
+                >
+                  <Sparkles className="h-5 w-5 text-purple-400 hover:text-purple-300" />
+                  {/* Premium indicator */}
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>AI Assistant</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
         {/* Separator */}
@@ -160,6 +186,13 @@ export function DashboardSidebar() {
           </Tooltip>
         </div>
       </div>
+
+      {/* AI Assistant Modal */}
+      <AIAssistant 
+        isOpen={isAIAssistantOpen}
+        onClose={() => setIsAIAssistantOpen(false)}
+        userEmail={userEmail}
+      />
     </TooltipProvider>
   )
 }
