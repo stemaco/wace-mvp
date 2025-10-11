@@ -3,6 +3,9 @@
  * Provides a robust interface for storing auth data in Vercel Blob
  */
 
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { join } from 'path'
+
 interface BlobStorageConfig {
   maxRetries?: number
   retryDelay?: number
@@ -18,6 +21,8 @@ interface BlobResponse<T> {
 class BlobStorageService {
   private readonly config: Required<BlobStorageConfig>
   private readonly baseUrl: string
+  private memoryStore: Map<string, any> = new Map() // In-memory store for development
+  private readonly storageFile: string = join(process.cwd(), '.blob-storage.json')
 
   constructor(config: BlobStorageConfig = {}) {
     this.config = {
@@ -28,6 +33,30 @@ class BlobStorageService {
     
     // In production, this would use the actual Vercel Blob API
     this.baseUrl = process.env.VERCEL_BLOB_URL || 'https://blob.vercel-storage.com'
+    
+    // Load existing data from file if it exists
+    this.loadFromFile()
+  }
+  
+  private loadFromFile() {
+    try {
+      if (existsSync(this.storageFile)) {
+        const data = JSON.parse(readFileSync(this.storageFile, 'utf-8'))
+        this.memoryStore = new Map(Object.entries(data))
+        console.log('[Blob Storage] Loaded', this.memoryStore.size, 'entries from file')
+      }
+    } catch (error) {
+      console.error('[Blob Storage] Error loading from file:', error)
+    }
+  }
+  
+  private saveToFile() {
+    try {
+      const data = Object.fromEntries(this.memoryStore.entries())
+      writeFileSync(this.storageFile, JSON.stringify(data, null, 2))
+    } catch (error) {
+      console.error('[Blob Storage] Error saving to file:', error)
+    }
   }
 
   /**
@@ -118,10 +147,10 @@ class BlobStorageService {
         // Simulate API call
         await this.delay(50) // Simulate network latency
         
-        // Store in localStorage for demo (in production, this would be actual Blob storage)
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(`blob_${pathname}`, JSON.stringify(data))
-        }
+        // Store in memory for development (in production, this would be actual Blob storage)
+        this.memoryStore.set(`blob_${pathname}`, data)
+        console.log(`[Blob Storage] Stored: ${pathname}`, data)
+        this.saveToFile() // Persist to file
         
         return {
           success: true,
@@ -145,14 +174,13 @@ class BlobStorageService {
         // Simulate API call
         await this.delay(30) // Simulate network latency
         
-        // Get from localStorage for demo
-        if (typeof window !== 'undefined') {
-          const data = localStorage.getItem(`blob_${pathname}`)
-          if (data) {
-            return {
-              success: true,
-              data: JSON.parse(data) as T
-            }
+        // Get from memory for development
+        const data = this.memoryStore.get(`blob_${pathname}`)
+        console.log(`[Blob Storage] Retrieved ${pathname}:`, data ? 'found' : 'not found')
+        if (data) {
+          return {
+            success: true,
+            data: data as T
           }
         }
         
@@ -178,9 +206,11 @@ class BlobStorageService {
         // Simulate API call
         await this.delay(40) // Simulate network latency
         
-        // Delete from localStorage for demo
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem(`blob_${pathname}`)
+        // Delete from memory for development
+        const deleted = this.memoryStore.delete(`blob_${pathname}`)
+        console.log(`[Blob Storage] Deleted ${pathname}:`, deleted)
+        if (deleted) {
+          this.saveToFile() // Persist to file
         }
         
         return { success: true }
@@ -217,21 +247,20 @@ class BlobStorageService {
         
         const blobs: any[] = []
         
-        // Get from localStorage for demo
-        if (typeof window !== 'undefined') {
-          const prefix = options?.prefix || ''
-          const keys = Object.keys(localStorage).filter(k => k.startsWith(`blob_${prefix}`))
-          
-          keys.forEach(key => {
-            const pathname = key.replace('blob_', '')
-            blobs.push({
-              url: `${this.baseUrl}/${pathname}`,
-              pathname,
-              size: localStorage.getItem(key)?.length || 0,
-              uploadedAt: new Date()
-            })
+        // Get from memory for development
+        const prefix = options?.prefix || ''
+        const keys = Array.from(this.memoryStore.keys()).filter(k => k.startsWith(`blob_${prefix}`))
+        
+        keys.forEach(key => {
+          const pathname = key.replace('blob_', '')
+          const data = this.memoryStore.get(key)
+          blobs.push({
+            url: `${this.baseUrl}/${pathname}`,
+            pathname,
+            size: JSON.stringify(data).length,
+            uploadedAt: new Date()
           })
-        }
+        })
         
         return {
           success: true,
