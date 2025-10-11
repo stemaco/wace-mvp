@@ -35,7 +35,8 @@ class EmailService {
 
   constructor() {
     this.apiKey = process.env.RESEND_API_KEY || ''
-    this.fromEmail = process.env.EMAIL_FROM || 'noreply@wace.ai'
+    // Use Resend's default sender email that works without domain verification
+    this.fromEmail = process.env.EMAIL_FROM || 'onboarding@resend.dev'
     this.fromName = process.env.EMAIL_FROM_NAME || 'WACE Team'
     this.isDevelopment = process.env.NODE_ENV !== 'production'
   }
@@ -69,24 +70,41 @@ class EmailService {
       }
 
       // In production with valid API key, use Resend API
+      try {
+        // Use Resend API directly
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from,
+            to: Array.isArray(options.to) ? options.to : [options.to],
+            subject: template.subject,
+            html: template.html,
+            text: template.text,
+            reply_to: options.replyTo,
+            cc: options.cc,
+            bcc: options.bcc,
+          }),
+        })
 
-      // Resend API call would go here
-      // For now, simulate the API call
-      const response = await this.simulateResendAPI({
-        from,
-        to: Array.isArray(options.to) ? options.to : [options.to],
-        subject: template.subject,
-        html: template.html,
-        text: template.text,
-        reply_to: options.replyTo,
-        cc: options.cc,
-        bcc: options.bcc,
-        attachments: options.attachments,
-      })
+        if (!response.ok) {
+          const error = await response.text()
+          console.error('Resend API error:', error)
+          throw new Error(`Resend API error: ${response.status}`)
+        }
 
-      return {
-        success: true,
-        messageId: response.id,
+        const data = await response.json()
+        
+        return {
+          success: true,
+          messageId: data.id,
+        }
+      } catch (apiError) {
+        console.error('Failed to send email via Resend:', apiError)
+        throw apiError
       }
     } catch (error) {
       console.error('Failed to send email:', error)
