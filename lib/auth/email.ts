@@ -37,7 +37,7 @@ class EmailService {
     this.apiKey = process.env.RESEND_API_KEY || ''
     this.fromEmail = process.env.EMAIL_FROM || 'noreply@wace.ai'
     this.fromName = process.env.EMAIL_FROM_NAME || 'WACE Team'
-    this.isDevelopment = process.env.NODE_ENV === 'development'
+    this.isDevelopment = process.env.NODE_ENV !== 'production'
   }
 
   /**
@@ -50,13 +50,16 @@ class EmailService {
     try {
       const from = options.from || `${this.fromName} <${this.fromEmail}>`
       
-      if (this.isDevelopment) {
-        // In development, log to console instead of sending
-        console.log('📧 Email would be sent:')
+      // If no API key, always use development mode
+      if (!this.apiKey || this.apiKey === 're_your_resend_api_key_here') {
+        // Log to console instead of sending
+        console.log('📧 Email (Dev Mode):')
         console.log('To:', options.to)
         console.log('From:', from)
         console.log('Subject:', template.subject)
-        console.log('Content:', template.text || 'HTML email')
+        if (template.text) {
+          console.log('Content:', template.text)
+        }
         console.log('---')
         
         return {
@@ -65,10 +68,7 @@ class EmailService {
         }
       }
 
-      // In production, use Resend API
-      if (!this.apiKey) {
-        throw new Error('Resend API key is not configured')
-      }
+      // In production with valid API key, use Resend API
 
       // Resend API call would go here
       // For now, simulate the API call
@@ -128,6 +128,12 @@ class EmailService {
   ): Promise<EmailResult> {
     const formattedOTP = otp.slice(0, 3) + ' ' + otp.slice(3)
     const expiryMinutes = process.env.OTP_EXPIRY_MINUTES || '5'
+    
+    // Log OTP for development
+    if (!this.apiKey || this.apiKey === 're_your_resend_api_key_here') {
+      console.log('🔐 OTP Code for', email, ':', formattedOTP)
+      console.log('   Raw OTP:', otp)
+    }
     
     const template: EmailTemplate = {
       subject: `${formattedOTP} is your WACE verification code`,
