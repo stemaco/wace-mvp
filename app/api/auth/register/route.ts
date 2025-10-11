@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authStorage } from '@/lib/auth/storage'
 import { hashPassword, validatePasswordStrength } from '@/lib/auth/password'
-import { generateSessionId, generateAccessToken, generateRefreshToken } from '@/lib/auth/jwt'
+import { generateSessionId, generateAccessToken, generateRefreshToken } from '@/lib/auth/jwt-simple'
 import { emailService } from '@/lib/auth/email'
 import { checkRegistrationLimit } from '@/lib/auth/rate-limiter'
 import { User, Session } from '@/types/auth'

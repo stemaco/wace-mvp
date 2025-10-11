@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authStorage } from '@/lib/auth/storage'
-import { verifyToken } from '@/lib/auth/jwt'
+import { verifyToken } from '@/lib/auth/jwt-simple'
 
 export async function POST(request: NextRequest) {
   try {

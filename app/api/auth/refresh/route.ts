@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authStorage } from '@/lib/auth/storage'
-import { verifyRefreshToken, generateAccessToken, generateRefreshToken, generateSessionId } from '@/lib/auth/jwt'
+import { verifyRefreshToken, generateAccessToken, generateRefreshToken, generateSessionId } from '@/lib/auth/jwt-simple'
 import { Session } from '@/types/auth'
 
 export async function POST(request: NextRequest) {
