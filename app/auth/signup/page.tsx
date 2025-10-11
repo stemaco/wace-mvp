@@ -1,285 +1,192 @@
 "use client"
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { OTPInput } from '@/components/auth/otp-input'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Check, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
-interface PasswordRequirement {
-  label: string
-  regex: RegExp
-}
-
-const passwordRequirements: PasswordRequirement[] = [
-  { label: 'At least 8 characters', regex: /.{8,}/ },
-  { label: 'One uppercase letter', regex: /[A-Z]/ },
-  { label: 'One lowercase letter', regex: /[a-z]/ },
-  { label: 'One number', regex: /[0-9]/ },
-  { label: 'One special character', regex: /[!@#$%^&*(),.?":{}|<>]/ },
-]
-
-export default function SignUpPage() {
+export default function SimpleSignUpPage() {
   const router = useRouter()
+  const [step, setStep] = useState<'details' | 'verify'>('details')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    confirmPassword: '',
   })
+  const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false)
 
-  const checkPasswordRequirement = (password: string, regex: RegExp) => {
-    return regex.test(password)
-  }
-
-  const isPasswordValid = () => {
-    return passwordRequirements.every(req => 
-      checkPasswordRequirement(formData.password, req.regex)
-    )
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }))
-
-    // Show password requirements when user starts typing password
-    if (name === 'password' && value.length > 0) {
-      setShowPasswordRequirements(true)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Step 1: Send OTP
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      setLoading(false)
-      return
-    }
-
-    // Validate password strength
-    if (!isPasswordValid()) {
-      setError('Password does not meet all requirements')
-      setLoading(false)
-      return
-    }
-
     try {
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
+          ...formData,
+          step: 'send-otp',
         }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        // Handle specific error cases
-        if (response.status === 409) {
-          setError('An account already exists with this email address')
-        } else if (data.details) {
-          setError(data.details.join(', '))
-        } else {
-          setError(data.error || 'Registration failed')
-        }
-        return
+        throw new Error(data.error || 'Failed to send OTP')
       }
 
-      // Store tokens in localStorage (optional, cookies are already set)
-      if (data.accessToken) {
-        localStorage.setItem('accessToken', data.accessToken)
-      }
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken)
+      setStep('verify')
+    } catch (error: any) {
+      setError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Step 2: Verify OTP
+  const handleVerifyOTP = async () => {
+    if (otp.length !== 6) return
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          otp,
+          step: 'verify-otp',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to verify OTP')
       }
 
       // Redirect to dashboard
       router.push('/dashboard')
     } catch (error: any) {
-      setError('Something went wrong. Please try again.')
+      setError(error.message)
+      setOtp('')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Create account</h1>
-          <p className="text-gray-600 mt-2">
-            Join WACE and start collaborating
-          </p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg">
+        <h1 className="text-2xl font-bold text-center mb-6">Create Account</h1>
 
-        {/* Error Alert */}
         {error && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <AlertDescription className="text-red-800">
-              {error}
-            </AlertDescription>
+          <Alert className="mb-4 border-red-200 bg-red-50">
+            <AlertDescription className="text-red-800">{error}</AlertDescription>
           </Alert>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Name */}
-          <div>
-            <Label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              Full name
-            </Label>
-            <Input
-              id="name"
-              name="name"
-              type="text"
-              placeholder="John Doe"
-              value={formData.name}
-              onChange={handleInputChange}
-              required
-              disabled={loading}
-              className="w-full"
-              autoFocus
-            />
-          </div>
+        {step === 'details' && (
+          <form onSubmit={handleSendOTP} className="space-y-4">
+            <div>
+              <Label htmlFor="name">Full Name</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                disabled={loading}
+              />
+            </div>
 
-          {/* Email */}
-          <div>
-            <Label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email address
-            </Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              value={formData.email}
-              onChange={handleInputChange}
-              required
-              disabled={loading}
-              className="w-full"
-            />
-          </div>
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                disabled={loading}
+              />
+            </div>
 
-          {/* Password */}
-          <div>
-            <Label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Enter a strong password"
-              value={formData.password}
-              onChange={handleInputChange}
-              required
-              disabled={loading}
-              className="w-full"
-            />
-            
-            {/* Password Requirements */}
-            {showPasswordRequirements && formData.password && (
-              <div className="mt-3 space-y-1">
-                {passwordRequirements.map((req, index) => {
-                  const isMet = checkPasswordRequirement(formData.password, req.regex)
-                  return (
-                    <div
-                      key={index}
-                      className={`flex items-center text-xs ${
-                        isMet ? 'text-green-600' : 'text-gray-500'
-                      }`}
-                    >
-                      {isMet ? (
-                        <Check className="mr-1 h-3 w-3" />
-                      ) : (
-                        <X className="mr-1 h-3 w-3" />
-                      )}
-                      {req.label}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+                disabled={loading}
+                minLength={8}
+              />
+            </div>
 
-          {/* Confirm Password */}
-          <div>
-            <Label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-              Confirm password
-            </Label>
-            <Input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              placeholder="Re-enter your password"
-              value={formData.confirmPassword}
-              onChange={handleInputChange}
-              required
-              disabled={loading}
-              className="w-full"
-            />
-            {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-              <p className="mt-1 text-xs text-red-600">Passwords do not match</p>
-            )}
-          </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending OTP...
+                </>
+              ) : (
+                'Send OTP'
+              )}
+            </Button>
+          </form>
+        )}
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={loading || !formData.email || !formData.password || 
-                     !formData.confirmPassword || !isPasswordValid() ||
-                     formData.password !== formData.confirmPassword}
-            className="w-full"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating account...
-              </>
-            ) : (
-              'Create account'
-            )}
-          </Button>
-
-          {/* Terms */}
-          <p className="text-xs text-center text-gray-600">
-            By creating an account, you agree to our{' '}
-            <Link href="/terms" className="text-blue-600 hover:text-blue-700">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link href="/privacy" className="text-blue-600 hover:text-blue-700">
-              Privacy Policy
-            </Link>
-          </p>
-
-          {/* Sign In Link */}
-          <div className="text-center pt-4 border-t">
+        {step === 'verify' && (
+          <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Already have an account?{' '}
-              <Link href="/auth/signin" className="text-blue-600 hover:text-blue-700 font-medium">
-                Sign in
-              </Link>
+              We sent a verification code to {formData.email}
             </p>
+
+            <div>
+              <Label>Enter OTP</Label>
+              <OTPInput
+                value={otp}
+                onChange={setOtp}
+                onComplete={handleVerifyOTP}
+                disabled={loading}
+              />
+            </div>
+
+            <Button 
+              onClick={handleVerifyOTP} 
+              className="w-full" 
+              disabled={loading || otp.length !== 6}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                'Verify & Create Account'
+              )}
+            </Button>
+
+            <button
+              onClick={() => setStep('details')}
+              className="w-full text-sm text-gray-600 hover:text-gray-900"
+              disabled={loading}
+            >
+              Back
+            </button>
           </div>
-        </form>
+        )}
       </div>
     </div>
   )
