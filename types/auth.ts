@@ -7,6 +7,7 @@ export interface User {
   isVerified: boolean
   createdAt: Date
   updatedAt: Date
+  password?: string // Optional, only used for storage
 }
 
 export interface Session {

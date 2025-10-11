@@ -87,10 +87,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Store user with hashed password
-    await authStorage.createUser({
+    const userWithPassword: User = {
       ...user,
       password: hashedPassword,
-    } as User & { password: string })
+    }
+    await authStorage.createUser(userWithPassword)
 
     // Generate session
     const sessionId = generateSessionId()

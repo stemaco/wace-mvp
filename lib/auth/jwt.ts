@@ -1,6 +1,11 @@
 import crypto from 'crypto'
 import { TokenPayload } from '@/types/auth'
 
+// Define constants outside the class to avoid initialization issues
+const ACCESS_TOKEN_EXPIRY = 15 * 60 // 15 minutes
+const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60 // 7 days
+const ISSUER = 'wace-mvp'
+
 interface JWTHeader {
   alg: string
   typ: string
@@ -14,9 +19,6 @@ interface JWTPayload extends TokenPayload {
 }
 
 export class JWTService {
-  private static readonly ACCESS_TOKEN_EXPIRY = 15 * 60 // 15 minutes
-  private static readonly REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60 // 7 days
-  private static readonly ISSUER = 'wace-mvp'
 
   /**
    * Base64URL encode
@@ -63,8 +65,8 @@ export class JWTService {
     const jwtPayload: JWTPayload = {
       ...payload,
       iat: now,
-      exp: now + this.ACCESS_TOKEN_EXPIRY,
-      iss: this.ISSUER,
+      exp: now + ACCESS_TOKEN_EXPIRY,
+      iss: ISSUER,
       sub: payload.userId,
     }
 
@@ -92,8 +94,8 @@ export class JWTService {
     const jwtPayload: JWTPayload = {
       ...payload,
       iat: now,
-      exp: now + this.REFRESH_TOKEN_EXPIRY,
-      iss: this.ISSUER,
+      exp: now + REFRESH_TOKEN_EXPIRY,
+      iss: ISSUER,
       sub: payload.userId,
     }
 
@@ -137,7 +139,7 @@ export class JWTService {
       }
 
       // Check issuer
-      if (payload.iss !== this.ISSUER) {
+      if (payload.iss !== ISSUER) {
         return null
       }
 
