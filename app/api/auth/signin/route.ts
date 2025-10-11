@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyPassword, generateSessionId } from '@/lib/auth/simple-auth'
-import { blobStorage } from '@/lib/auth/blob-storage'
+import { firestoreService } from '@/lib/auth/firestore-service'
 import { checkLoginLimit } from '@/lib/auth/rate-limiter'
 
 export async function POST(request: NextRequest) {
@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user ID from email
-    const emailMappingResult = await blobStorage.get(`users/email/${email.toLowerCase()}`)
-    if (!emailMappingResult.success || !emailMappingResult.data) {
+    const userIdResult = await firestoreService.getUserIdByEmail(email.toLowerCase())
+    if (!userIdResult.success || !userIdResult.data) {
       // Don't reveal if user exists, but log for debugging
       console.log('Login attempt for non-existent email:', email.toLowerCase())
       await checkLoginLimit(email, ip, false) // Mark as failed
@@ -42,10 +42,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { userId } = emailMappingResult.data as any
+    const userId = userIdResult.data
 
     // Get user data
-    const userResult = await blobStorage.get(`users/${userId}/profile.json`)
+    const userResult = await firestoreService.getUser(userId)
     if (!userResult.success || !userResult.data) {
       return NextResponse.json(
         { error: 'User data not found' },
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = userResult.data as any
+    const user = userResult.data
 
     // Verify password
     const isValidPassword = await verifyPassword(password, user.password)
@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
     }
 
-    // Store session in Blob
-    await blobStorage.put(`sessions/${sessionId}`, session)
+    // Store session in Firestore
+    await firestoreService.storeSession(sessionId, session)
 
     // Prepare response
     const response = NextResponse.json({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateUserId, hashPassword, generateOTP, generateSessionId } from '@/lib/auth/simple-auth'
-import { blobStorage } from '@/lib/auth/blob-storage'
+import { firestoreService } from '@/lib/auth/firestore-service'
 import { emailService } from '@/lib/auth/email'
 import { checkRegistrationLimit } from '@/lib/auth/rate-limiter'
 
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if user exists
-      const existingUser = await blobStorage.get(`users/email/${email.toLowerCase()}`)
+      const existingUser = await firestoreService.getUserIdByEmail(email.toLowerCase())
       if (existingUser.success && existingUser.data) {
         return NextResponse.json(
           { error: 'User already exists' },
@@ -62,10 +62,8 @@ export async function POST(request: NextRequest) {
         expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
       }
 
-      // Store temp signup data
-      await blobStorage.put(`temp/signup/${email.toLowerCase()}`, tempData, {
-        contentType: 'application/json',
-      })
+      // Store temp signup data in Firestore
+      await firestoreService.storeTempSignup(email.toLowerCase(), tempData)
 
       // Send OTP email (will log to console if no API key)
       await emailService.sendOTPEmail(email, otp, { userName: name })
@@ -87,25 +85,16 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Get temp signup data
-      const tempResult = await blobStorage.get(`temp/signup/${email.toLowerCase()}`)
+      // Get temp signup data from Firestore
+      const tempResult = await firestoreService.getTempSignup(email.toLowerCase())
       if (!tempResult.success || !tempResult.data) {
         return NextResponse.json(
-          { error: 'Signup session expired. Please try again.' },
+          { error: tempResult.error?.message || 'Signup session expired. Please try again.' },
           { status: 400 }
         )
       }
 
-      const tempData = tempResult.data as any
-
-      // Check if OTP expired
-      if (Date.now() > tempData.expiresAt) {
-        await blobStorage.del(`temp/signup/${email.toLowerCase()}`)
-        return NextResponse.json(
-          { error: 'OTP expired. Please try again.' },
-          { status: 400 }
-        )
-      }
+      const tempData = tempResult.data
 
       // Verify OTP
       if (tempData.otp !== otp) {
@@ -128,12 +117,11 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date().toISOString(),
       }
 
-      // Store user in Blob
-      await blobStorage.put(`users/${userId}/profile.json`, user)
-      await blobStorage.put(`users/email/${user.email}`, { userId }) // Email to ID mapping
+      // Store user in Firestore
+      await firestoreService.storeUser(userId, user)
 
       // Clean up temp data
-      await blobStorage.del(`temp/signup/${email.toLowerCase()}`)
+      await firestoreService.deleteTempSignup(email.toLowerCase())
 
       // Create session
       const sessionId = generateSessionId()
@@ -147,8 +135,8 @@ export async function POST(request: NextRequest) {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
       }
 
-      // Store session
-      await blobStorage.put(`sessions/${sessionId}`, session)
+      // Store session in Firestore
+      await firestoreService.storeSession(sessionId, session)
 
       // Send welcome email
       emailService.sendWelcomeEmail(user.email, user.name).catch(console.error)
