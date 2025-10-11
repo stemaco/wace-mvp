@@ -44,6 +44,16 @@ export async function POST(request: NextRequest) {
 
       // Generate OTP
       const otp = generateOTP()
+      
+      // Log OTP for debugging/testing
+      console.log('=================================')
+      console.log('🔐 OTP GENERATED FOR SIGNUP')
+      console.log('Email:', email.toLowerCase())
+      console.log('OTP Code:', otp)
+      console.log('Formatted:', otp.slice(0, 3) + ' ' + otp.slice(3))
+      console.log('Expires in: 5 minutes')
+      console.log('=================================')
+      
       const tempData = {
         email: email.toLowerCase(),
         password: await hashPassword(password),
@@ -57,7 +67,7 @@ export async function POST(request: NextRequest) {
         contentType: 'application/json',
       })
 
-      // Send OTP email
+      // Send OTP email (will log to console if no API key)
       await emailService.sendOTPEmail(email, otp, { userName: name })
 
       return NextResponse.json({

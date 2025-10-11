@@ -29,10 +29,10 @@ interface RateLimitStore {
 class RateLimiterService {
   private store: Map<string, RateLimitStore> = new Map()
   private readonly defaultRules: Record<string, RateLimitRule> = {
-    // OTP generation - strict limit
+    // OTP generation - more lenient for testing
     otp_generation: {
       windowMs: 60 * 60 * 1000, // 1 hour
-      maxRequests: 3,
+      maxRequests: 10, // Increased from 3 to 10
     },
     // OTP verification - moderate limit
     otp_verification: {
@@ -52,10 +52,10 @@ class RateLimiterService {
       maxRequests: 5,
       skipSuccessfulRequests: true,
     },
-    // Registration - per IP
+    // Registration - per IP - more lenient for testing
     registration_ip: {
       windowMs: 60 * 60 * 1000, // 1 hour
-      maxRequests: 3,
+      maxRequests: 20, // Increased from 3 to 20 for testing
     },
     // Password reset - per email
     password_reset: {

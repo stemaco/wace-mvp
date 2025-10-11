@@ -33,10 +33,11 @@ export async function POST(request: NextRequest) {
     // Get user ID from email
     const emailMappingResult = await blobStorage.get(`users/email/${email.toLowerCase()}`)
     if (!emailMappingResult.success || !emailMappingResult.data) {
-      // Don't reveal if user exists
+      // Don't reveal if user exists, but log for debugging
+      console.log('Login attempt for non-existent email:', email.toLowerCase())
       await checkLoginLimit(email, ip, false) // Mark as failed
       return NextResponse.json(
-        { error: 'Invalid email or password' },
+        { error: 'Invalid email or password. Please check your credentials or sign up for a new account.' },
         { status: 401 }
       )
     }
