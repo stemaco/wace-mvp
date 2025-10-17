@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is accessing their own data
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Users collection - users can read their own data only
+    // Writes are restricted to server-side operations via Admin SDK
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false; // Only server-side writes via Admin SDK
+    }
+
+    // Email mappings - only server-side access for authentication lookups
+    match /email_mappings/{email} {
+      allow read, write: if false; // Server-side only
+    }
+
+    // Temporary signups - only server-side access during OTP verification
+    match /temp_signups/{email} {
+      allow read, write: if false; // Server-side only
+    }
+
+    // Sessions - only server-side access for session management
+    match /sessions/{sessionId} {
+      allow read, write: if false; // Server-side only
+    }
+
+    // Rate limits - only server-side access for rate limiting
+    match /rate_limits/{key} {
+      allow read, write: if false; // Server-side only
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
