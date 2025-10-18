@@ -50,11 +50,11 @@ class EmailService {
   ): Promise<EmailResult> {
     try {
       const from = options.from || `${this.fromName} <${this.fromEmail}>`
-      
+
       // If no API key, always use development mode
       if (!this.apiKey || this.apiKey === 're_your_resend_api_key_here') {
         // Log to console instead of sending
-        console.log('📧 Email (Dev Mode):')
+        console.log('📧 Email (Dev Mode - No API Key):')
         console.log('To:', options.to)
         console.log('From:', from)
         console.log('Subject:', template.subject)
@@ -62,7 +62,7 @@ class EmailService {
           console.log('Content:', template.text)
         }
         console.log('---')
-        
+
         return {
           success: true,
           messageId: `dev_${Date.now()}`,
@@ -71,6 +71,18 @@ class EmailService {
 
       // In production with valid API key, use Resend API
       try {
+        // Resend test mode restriction: can only send to account owner's email
+        // Override recipient email in development/test mode
+        const testEmail = process.env.RESEND_TEST_EMAIL
+        let recipientEmail = options.to
+
+        if (this.isDevelopment && testEmail) {
+          const originalEmail = Array.isArray(options.to) ? options.to[0] : options.to
+          recipientEmail = testEmail
+          console.log(`📧 [Test Mode] Redirecting email from ${originalEmail} to ${testEmail}`)
+          console.log(`   Subject: ${template.subject}`)
+        }
+
         // Use Resend API directly
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',
@@ -80,7 +92,7 @@ class EmailService {
           },
           body: JSON.stringify({
             from,
-            to: Array.isArray(options.to) ? options.to : [options.to],
+            to: Array.isArray(recipientEmail) ? recipientEmail : [recipientEmail],
             subject: template.subject,
             html: template.html,
             text: template.text,
@@ -91,13 +103,17 @@ class EmailService {
         })
 
         if (!response.ok) {
-          const error = await response.text()
+          const error = await response.json()
           console.error('Resend API error:', error)
-          throw new Error(`Resend API error: ${response.status}`)
+          console.error('Status:', response.status)
+          throw new Error(error.message || `Resend API error: ${response.status}`)
         }
 
         const data = await response.json()
-        
+
+        console.log('✅ Email sent successfully via Resend!')
+        console.log('   Message ID:', data.id)
+
         return {
           success: true,
           messageId: data.id,
