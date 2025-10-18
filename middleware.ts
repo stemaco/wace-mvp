@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 // Define public routes that don't require authentication
 const publicRoutes = [
   '/',
+  '/signin',
+  '/signup',
   '/auth/signin',
   '/auth/signup',
   '/api/auth/signup',
