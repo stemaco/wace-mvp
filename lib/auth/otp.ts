@@ -162,13 +162,13 @@ export class OTPService {
   }
 }
 
-// Export convenience functions
-export const generateOTP = OTPService.generateOTP
-export const createOTP = OTPService.createOTP
-export const verifyOTP = OTPService.verifyOTP
-export const formatOTP = OTPService.formatOTP
-export const validateOTPFormat = OTPService.validateOTPFormat
-export const cleanOTPInput = OTPService.cleanOTPInput
-export const hasPendingOTP = OTPService.hasPendingOTP
-export const getRemainingTime = OTPService.getRemainingTime
-export const cancelOTP = OTPService.cancelOTP
+// Export convenience functions with proper binding to preserve 'this' context
+export const generateOTP = OTPService.generateOTP.bind(OTPService)
+export const createOTP = OTPService.createOTP.bind(OTPService)
+export const verifyOTP = OTPService.verifyOTP.bind(OTPService)
+export const formatOTP = OTPService.formatOTP.bind(OTPService)
+export const validateOTPFormat = OTPService.validateOTPFormat.bind(OTPService)
+export const cleanOTPInput = OTPService.cleanOTPInput.bind(OTPService)
+export const hasPendingOTP = OTPService.hasPendingOTP.bind(OTPService)
+export const getRemainingTime = OTPService.getRemainingTime.bind(OTPService)
+export const cancelOTP = OTPService.cancelOTP.bind(OTPService)
