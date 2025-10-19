@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { firestoreService } from '@/lib/auth/firestore-service'
+import { authStorage } from '@/lib/auth/storage'
 
 export async function POST(request: NextRequest) {
   try {
     // Get session from cookie
     const sessionId = request.cookies.get('session')?.value
 
-    // Delete session from Firestore if exists
+    // Delete session from database if exists
     if (sessionId) {
-      await firestoreService.deleteSession(sessionId)
+      await authStorage.deleteSession(sessionId)
     }
 
     // Clear session cookie

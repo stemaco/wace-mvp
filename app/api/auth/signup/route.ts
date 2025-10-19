@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateUserId, hashPassword, generateOTP, generateSessionId } from '@/lib/auth/simple-auth'
-import { firestoreService } from '@/lib/auth/firestore-service'
+import { authStorage } from '@/lib/auth/storage'
 import { emailService } from '@/lib/auth/email'
 import { checkRegistrationLimit } from '@/lib/auth/rate-limiter'
 
@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if user exists
-      const existingUser = await firestoreService.getUserIdByEmail(email.toLowerCase())
-      if (existingUser.success && existingUser.data) {
+      const existingUser = await authStorage.getUserByEmail(email.toLowerCase())
+      if (existingUser) {
         return NextResponse.json(
           { error: 'User already exists' },
           { status: 409 }
@@ -54,16 +54,15 @@ export async function POST(request: NextRequest) {
       console.log('Expires in: 5 minutes')
       console.log('=================================')
       
-      const tempData = {
-        email: email.toLowerCase(),
-        password: await hashPassword(password),
-        name,
-        otp,
-        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
-      }
+      const hashedPassword = await hashPassword(password)
 
-      // Store temp signup data in Firestore
-      await firestoreService.storeTempSignup(email.toLowerCase(), tempData)
+      // Store temp signup data using OTP storage
+      // We'll store the hashed password and name in a temporary location
+      // In a real app, you might want a separate temp_signups table
+      await authStorage.createOTP(email.toLowerCase(), otp)
+
+      // Store additional signup data temporarily (workaround - in production use separate temp_signups table)
+      // For now, we'll rely on the OTP and the client to send the data back
 
       // Send OTP email (will log to console if no API key)
       await emailService.sendOTPEmail(email, otp, { userName: name })
@@ -76,28 +75,26 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Verify OTP and complete signup
     if (step === 'verify-otp') {
-      const { email, otp } = body
+      const { email, otp, password, name } = body
 
-      if (!email || !otp) {
+      if (!email || !otp || !password || !name) {
         return NextResponse.json(
-          { error: 'Email and OTP are required' },
+          { error: 'All fields are required' },
           { status: 400 }
         )
       }
 
-      // Get temp signup data from Firestore
-      const tempResult = await firestoreService.getTempSignup(email.toLowerCase())
-      if (!tempResult.success || !tempResult.data) {
+      // Get OTP from storage
+      const storedOtp = await authStorage.getOTP(email.toLowerCase())
+      if (!storedOtp) {
         return NextResponse.json(
-          { error: tempResult.error?.message || 'Signup session expired. Please try again.' },
+          { error: 'OTP expired or not found. Please try again.' },
           { status: 400 }
         )
       }
-
-      const tempData = tempResult.data
 
       // Verify OTP
-      if (tempData.otp !== otp) {
+      if (storedOtp.code !== otp) {
         return NextResponse.json(
           { error: 'Invalid OTP' },
           { status: 400 }
@@ -108,35 +105,34 @@ export async function POST(request: NextRequest) {
       const userId = generateUserId()
       const user = {
         id: userId,
-        email: tempData.email,
-        name: tempData.name,
-        password: tempData.password,
-        role: 'user',
+        email: email.toLowerCase(),
+        name,
+        password: await hashPassword(password),
+        role: 'user' as const,
         isVerified: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }
 
-      // Store user in Firestore
-      await firestoreService.storeUser(userId, user)
+      // Store user in database
+      await authStorage.createUser(user)
 
-      // Clean up temp data
-      await firestoreService.deleteTempSignup(email.toLowerCase())
+      // Clean up OTP
+      await authStorage.deleteOTP(email.toLowerCase())
 
       // Create session
       const sessionId = generateSessionId()
       const session = {
         id: sessionId,
         userId,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+        token: '', // Will be set by JWT if needed
+        refreshToken: '', // Will be set by JWT if needed
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        createdAt: new Date(),
       }
 
-      // Store session in Firestore
-      await firestoreService.storeSession(sessionId, session)
+      // Store session in database
+      await authStorage.createSession(session)
 
       // Send welcome email
       emailService.sendWelcomeEmail(user.email, user.name).catch(console.error)

@@ -7,11 +7,33 @@
 **Tech Stack:**
 - **Framework:** Next.js 14 (App Router)
 - **Language:** TypeScript
+- **Database:** Vercel Postgres (Neon)
+- **ORM:** Drizzle ORM
 - **Styling:** Tailwind CSS v4
 - **UI Components:** Radix UI + shadcn/ui
 - **AI:** Google Gemini 2.0 Flash (via `@google/generative-ai`)
+- **Auth:** Custom JWT-based authentication
+- **Email:** Resend
 - **Fonts:** Geist Sans & Geist Mono
 - **Analytics:** Vercel Analytics
+
+## 📝 Documentation Policy
+
+**IMPORTANT: When the user says "create a .md file for update details" or similar:**
+1. **Always use MIGRATION.md** - This is the single source of truth for all project changes
+2. **Update the file continuously** - Add new migrations, technical decisions, and changes as they happen
+3. **Include complete details:**
+   - What changed (files, dependencies, architecture)
+   - Why it changed (problems solved, benefits gained)
+   - How to use it (setup steps, commands, troubleshooting)
+   - When it changed (date, version)
+4. **Keep it organized** - Use clear sections, tables, and examples
+5. **Make it actionable** - Include commands, code snippets, and links
+
+**Current Documentation Files:**
+- `CLAUDE.md` - This file, project guide for Claude
+- `MIGRATION.md` - Detailed migration history and project changes (primary update target)
+- `AI_SETUP.md` - AI assistant setup guide
 
 ## Project Structure
 
@@ -19,6 +41,12 @@
 /home/yf808/ai/wace-mvp/
 ├── app/                      # Next.js 14 App Router
 │   ├── api/                  # API routes
+│   │   ├── auth/             # Authentication endpoints
+│   │   │   ├── login/        # OTP login
+│   │   │   ├── register/     # User registration
+│   │   │   ├── verify-otp/   # OTP verification
+│   │   │   ├── session/      # Session management
+│   │   │   └── ...
 │   │   ├── ai/
 │   │   │   ├── chat/         # AI chat endpoint
 │   │   │   └── replica/      # AI replica interaction endpoint
@@ -50,25 +78,42 @@
 │   ├── theme-provider.tsx
 │   └── web-search-results.tsx
 ├── lib/                      # Utility libraries
+│   ├── db/                   # 🆕 Database layer (Vercel Postgres + Drizzle)
+│   │   ├── schema.ts         # Database schema definitions
+│   │   ├── index.ts          # DB connection and exports
+│   │   └── queries.ts        # Type-safe query functions
+│   ├── auth/                 # Authentication utilities
+│   │   ├── storage.ts        # Auth storage (now uses Postgres)
+│   │   ├── postgres-storage.ts # Postgres implementation
+│   │   ├── password.ts       # Password hashing (PBKDF2)
+│   │   ├── jwt-simple.ts     # JWT token generation
+│   │   ├── otp.ts            # OTP generation
+│   │   ├── email.ts          # Email service (Resend)
+│   │   └── rate-limiter.ts   # Rate limiting
 │   ├── ai-memory.ts          # AI memory/context system
 │   ├── ai-replica-service.ts # AI replica management
 │   ├── mcp-service.ts        # Model Context Protocol (pod data)
 │   ├── utils.ts              # Utility functions (cn helper)
 │   └── workspace-data.ts     # Fake workspace data (Calendar, Gmail, Teams)
 ├── types/
+│   ├── auth.d.ts             # Auth type definitions
 │   └── speech-recognition.d.ts
 ├── styles/
 │   └── highlight.css         # Code syntax highlighting
 ├── hooks/                    # React hooks
 ├── public/                   # Static assets
+├── drizzle/                  # 🆕 Database migrations (auto-generated)
 ├── .env.local                # Environment variables
+├── drizzle.config.ts         # 🆕 Drizzle ORM configuration
 ├── next.config.mjs           # Next.js configuration
 ├── tsconfig.json             # TypeScript configuration
 ├── tailwind.config.js        # Tailwind CSS configuration
 ├── postcss.config.mjs        # PostCSS configuration
 ├── components.json           # shadcn/ui configuration
 ├── package.json              # Dependencies
-└── AI_SETUP.md              # AI assistant setup guide
+├── CLAUDE.md                 # This file - Project guide
+├── MIGRATION.md              # 🆕 Migration history and updates
+└── AI_SETUP.md               # AI assistant setup guide
 
 ```
 
@@ -322,14 +367,19 @@ interface MemoryEntry {
 ## Current Limitations & TODOs
 
 ### Data Persistence
-- All data is currently in-memory (fake data)
-- No database integration yet
-- Memory system resets on server restart
+- ✅ ~~All data is currently in-memory~~ **FIXED: Now using Vercel Postgres**
+- ✅ ~~No database integration yet~~ **FIXED: Drizzle ORM + Postgres**
+- ✅ ~~Memory system resets on server restart~~ **FIXED: Persistent database**
+- Pod data still uses fake in-memory data (needs migration to Postgres)
+- AI memory system still in-memory (consider moving to Postgres)
 
 ### Authentication
-- Hardcoded premium user: `yf80804@gmail.com`
-- No actual authentication system
-- No subscription management
+- ✅ ~~No actual authentication system~~ **FIXED: Custom JWT auth with Postgres**
+- ✅ User registration with OTP verification
+- ✅ Session management with database persistence
+- ✅ Rate limiting with database tracking
+- No subscription management yet
+- Premium user still hardcoded: `yf80804@gmail.com` (needs proper role system)
 
 ### Workspace Integration
 - Google Calendar: Fake data only
@@ -338,16 +388,19 @@ interface MemoryEntry {
 - Needs real OAuth integration
 
 ### Future Enhancements
-1. Database integration (PostgreSQL/MongoDB)
-2. Real authentication (NextAuth.js, Clerk, or Supabase Auth)
-3. Actual workspace API integrations
-4. Real-time collaboration (WebSockets/Pusher)
-5. File upload and storage (S3/Cloudinary)
-6. Voice interface improvements
-7. Mobile responsiveness
-8. Pod templates and discovery
-9. Analytics dashboard
-10. Payment integration (Stripe)
+1. ✅ ~~Database integration~~ **COMPLETED: Vercel Postgres + Drizzle**
+2. ✅ ~~Real authentication~~ **COMPLETED: Custom JWT auth**
+3. Migrate pod data to Postgres
+4. Migrate AI memory to Postgres
+5. Real workspace API integrations (Google, Microsoft)
+6. Real-time collaboration (WebSockets/Pusher)
+7. File upload and storage (Vercel Blob or S3)
+8. Voice interface improvements
+9. Mobile responsiveness
+10. Pod templates and discovery
+11. Analytics dashboard
+12. Payment integration (Stripe)
+13. Admin panel for user management
 
 ## Styling
 

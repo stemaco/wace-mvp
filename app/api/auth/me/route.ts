@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { firestoreService } from '@/lib/auth/firestore-service'
+import { authStorage } from '@/lib/auth/storage'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,23 +13,18 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get session from Firestore
-    const sessionResult = await firestoreService.getSession(sessionId)
-    if (!sessionResult.success || !sessionResult.data) {
+    // Get session from database
+    const session = await authStorage.getSession(sessionId)
+    if (!session) {
       // Session not found or expired, clear the cookie
       const response = NextResponse.json({ user: null }, { status: 200 })
       response.cookies.delete('session')
       return response
     }
 
-    const session = sessionResult.data
-
-    // Check if session is expired
-    const now = new Date()
-    const expiresAt = new Date(session.expiresAt)
-    if (now > expiresAt) {
-      // Session expired, delete it and clear cookie
-      await firestoreService.deleteSession(sessionId)
+    // Get user data
+    const user = await authStorage.getUserById(session.userId)
+    if (!user) {
       const response = NextResponse.json({ user: null }, { status: 200 })
       response.cookies.delete('session')
       return response
@@ -38,10 +33,10 @@ export async function GET(request: NextRequest) {
     // Return user data from session
     return NextResponse.json({
       user: {
-        id: session.userId,
-        email: session.email,
-        name: session.name,
-        role: session.role,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
       },
     })
   } catch (error) {

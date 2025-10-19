@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyPassword, generateSessionId } from '@/lib/auth/simple-auth'
-import { firestoreService } from '@/lib/auth/firestore-service'
+import { authStorage } from '@/lib/auth/storage'
 import { checkLoginLimit } from '@/lib/auth/rate-limiter'
 
 export async function POST(request: NextRequest) {
@@ -30,30 +30,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user ID from email
-    const userIdResult = await firestoreService.getUserIdByEmail(email.toLowerCase())
-    if (!userIdResult.success || !userIdResult.data) {
+    // Get user data by email
+    const user = await authStorage.getUserByEmail(email.toLowerCase())
+    if (!user || !user.password) {
       // Don't reveal if user exists, but log for debugging
-      console.log('Login attempt for non-existent email:', email.toLowerCase())
+      console.log('Login attempt for non-existent email or missing password:', email.toLowerCase())
       await checkLoginLimit(email, ip, false) // Mark as failed
       return NextResponse.json(
         { error: 'Invalid email or password. Please check your credentials or sign up for a new account.' },
         { status: 401 }
       )
     }
-
-    const userId = userIdResult.data
-
-    // Get user data
-    const userResult = await firestoreService.getUser(userId)
-    if (!userResult.success || !userResult.data) {
-      return NextResponse.json(
-        { error: 'User data not found' },
-        { status: 404 }
-      )
-    }
-
-    const user = userResult.data
 
     // Verify password
     const isValidPassword = await verifyPassword(password, user.password)
@@ -73,15 +60,14 @@ export async function POST(request: NextRequest) {
     const session = {
       id: sessionId,
       userId: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+      token: '', // Will be set by JWT if needed
+      refreshToken: '', // Will be set by JWT if needed
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      createdAt: new Date(),
     }
 
-    // Store session in Firestore
-    await firestoreService.storeSession(sessionId, session)
+    // Store session in database
+    await authStorage.createSession(session)
 
     // Prepare response
     const response = NextResponse.json({
