@@ -64,6 +64,8 @@ export default function SimpleSignUpPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: formData.email,
+          name: formData.name,
+          password: formData.password,
           otp,
           step: 'verify-otp',
         }),
