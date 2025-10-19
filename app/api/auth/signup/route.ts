@@ -3,6 +3,7 @@ import { generateUserId, hashPassword, generateOTP, generateSessionId } from '@/
 import { authStorage } from '@/lib/auth/storage'
 import { emailService } from '@/lib/auth/email'
 import { checkRegistrationLimit } from '@/lib/auth/rate-limiter'
+import { generateAccessToken, generateRefreshToken } from '@/lib/auth/jwt-simple'
 
 export async function POST(request: NextRequest) {
   try {
@@ -108,6 +109,7 @@ export async function POST(request: NextRequest) {
         email: email.toLowerCase(),
         name,
         password: await hashPassword(password),
+        avatar: null,
         role: 'user' as const,
         isVerified: true,
         createdAt: new Date(),
@@ -120,14 +122,28 @@ export async function POST(request: NextRequest) {
       // Clean up OTP
       await authStorage.deleteOTP(email.toLowerCase())
 
-      // Create session
+      // Generate session and tokens
       const sessionId = generateSessionId()
+      const accessToken = generateAccessToken({
+        userId,
+        email: user.email,
+        role: user.role,
+        sessionId,
+      })
+      const refreshToken = generateRefreshToken({
+        userId,
+        email: user.email,
+        role: user.role,
+        sessionId,
+      })
+
+      // Create session
       const session = {
         id: sessionId,
         userId,
-        token: '', // Will be set by JWT if needed
-        refreshToken: '', // Will be set by JWT if needed
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        token: accessToken,
+        refreshToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
         createdAt: new Date(),
       }
 
@@ -137,22 +153,44 @@ export async function POST(request: NextRequest) {
       // Send welcome email
       emailService.sendWelcomeEmail(user.email, user.name).catch(console.error)
 
-      // Set session cookie
+      // Prepare response with JWT tokens
       const response = NextResponse.json({
         success: true,
         message: 'Account created successfully',
         user: {
+          id: user.id,
           email: user.email,
           name: user.name,
+          avatar: user.avatar,
           role: user.role,
+          isVerified: true,
         },
+        accessToken,
+        refreshToken,
+      }, { status: 200 })
+
+      // Set secure cookies (same as verify-otp endpoint)
+      response.cookies.set('accessToken', accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 15 * 60, // 15 minutes
+        path: '/',
       })
 
-      response.cookies.set('session', sessionId, {
+      response.cookies.set('refreshToken', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60, // 7 days
+        path: '/',
+      })
+
+      response.cookies.set('sessionId', sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60, // 24 hours
         path: '/',
       })
 

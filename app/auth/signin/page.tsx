@@ -71,8 +71,18 @@ export default function SimpleSignInPage() {
         throw new Error(data.error || 'Failed to verify OTP')
       }
 
-      // Redirect to dashboard
-      router.push('/dashboard')
+      // Store tokens if provided (the verify-otp endpoint sets cookies automatically)
+      if (data.accessToken) {
+        localStorage.setItem('accessToken', data.accessToken)
+      }
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user))
+      }
+
+      console.log('Sign in successful, redirecting to dashboard')
+
+      // Use window.location for a hard redirect to ensure proper page load
+      window.location.href = '/dashboard'
     } catch (error: any) {
       setError(error.message)
       setOtp('')

@@ -77,8 +77,15 @@ export default function SimpleSignUpPage() {
         throw new Error(data.error || 'Failed to verify OTP')
       }
 
-      // Redirect to dashboard
-      router.push('/dashboard')
+      // Store user data if provided
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user))
+      }
+
+      console.log('Signup successful, redirecting to dashboard')
+
+      // Use window.location for a hard redirect to ensure proper page load
+      window.location.href = '/dashboard'
     } catch (error: any) {
       setError(error.message)
       setOtp('')
